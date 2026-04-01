@@ -40,7 +40,8 @@
     {%- set field_names = [] -%}
 {%- endif -%}
 
-{%- for field in field_names -%}
+{%- set skip_fields = ['platform'] -%}
+{%- for field in field_names if field not in skip_fields -%}
     {%- set col_name = '"EVENT"' if field | upper == 'EVENT' else field -%}
     {%- if alias -%}
         {{ alias }}.{{ col_name }}

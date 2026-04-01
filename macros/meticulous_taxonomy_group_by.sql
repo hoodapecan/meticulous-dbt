@@ -33,7 +33,8 @@
     {%- set field_names = [] -%}
 {%- endif -%}
 
-{%- for field in field_names -%}
+{%- set skip_fields = ['platform'] -%}
+{%- for field in field_names if field not in skip_fields -%}
     , {{ offset + loop.index }}
 {%- endfor -%}
 

@@ -37,7 +37,8 @@
     {%- set field_names = [] -%}
 {%- endif -%}
 
-{%- for field in field_names -%}
+{%- set skip_fields = ['platform'] -%}
+{%- for field in field_names if field not in skip_fields -%}
     {%- set col_name = '"EVENT"' if field | upper == 'EVENT' else field %}
             and ({{ left_alias }}.{{ col_name }} is null or lower({{ left_alias }}.{{ col_name }}) = lower({{ right_alias }}.{{ col_name }}))
 {%- endfor -%}

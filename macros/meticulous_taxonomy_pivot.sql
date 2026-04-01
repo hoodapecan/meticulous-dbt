@@ -41,7 +41,8 @@ pivoted as (
         platform_entity_id as campaign_id,
         entity_name as campaign_name,
         level,
-        {%- for field in field_names %}
+        {%- set skip_fields = ['platform'] -%}
+        {%- for field in field_names if field not in skip_fields %}
         max(case when field_name = '{{ field }}' then value_code end) as {{ adapter.quote(field) if field | upper in ['EVENT'] else field }}
         {%- if not loop.last %},{% endif %}
         {%- endfor %}
