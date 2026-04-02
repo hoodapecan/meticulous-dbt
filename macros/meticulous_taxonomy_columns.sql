@@ -30,7 +30,8 @@
 
 {%- set skip_fields = ['platform'] -%}
 {%- for field in field_names if field not in skip_fields -%}
-    {%- set col_name = '"EVENT"' if field | upper == 'EVENT' else field -%}
+    {%- set reserved = ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] -%}
+    {%- set col_name = '"' ~ field | upper ~ '"' if field | upper in reserved else field -%}
     {%- if alias -%}
         {{ alias }}.{{ col_name }}
     {%- else -%}

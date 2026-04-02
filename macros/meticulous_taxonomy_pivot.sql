@@ -43,7 +43,7 @@ pivoted as (
         level,
         {%- set skip_fields = ['platform'] -%}
         {%- for field in field_names if field not in skip_fields %}
-        max(case when field_name = '{{ field }}' then value_code end) as {{ adapter.quote(field) if field | upper in ['EVENT'] else field }}
+        max(case when field_name = '{{ field }}' then value_code end) as {{ '"' ~ field | upper ~ '"' if field | upper in ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] else field }}
         {%- if not loop.last %},{% endif %}
         {%- endfor %}
         {%- if field_names | length > 0 %},{% endif %}
