@@ -1,48 +1,37 @@
 {#
     meticulous_taxonomy_columns
 
-    Generates a comma-separated list of taxonomy dimension columns
-    with an optional table alias prefix. Discovers columns dynamically
-    from the METICULOUS_TAXONOMY_MAPPINGS table.
+    Generates a comma-separated list of taxonomy dimension columns.
+    Discovers columns from the pivoted staging model via INFORMATION_SCHEMA.
 
     Usage:
-        select
-            u.platform,
-            u.campaign_id,
-            {{ meticulous_dbt.meticulous_taxonomy_columns(
-                source('meticulous', 'meticulous_taxonomy_mappings'),
-                alias='t'
-            ) }}
-        from unioned u
-        left join taxonomy t on ...
-
-    Output:
-        t.brand,
-        t.channel,
-        t.tactic,
-        ...
+        {{ meticulous_dbt.meticulous_taxonomy_columns(
+            ref('stg_meticulous__taxonomy_mappings'),
+            alias='t'
+        ) }}
 #}
 
-{% macro meticulous_taxonomy_columns(taxonomy_source, alias=none) %}
+{% macro meticulous_taxonomy_columns(taxonomy_relation, alias=none) %}
 
-{%- set field_query -%}
-    select distinct field_name
-    from {{ taxonomy_source }}
-    where level = 'campaign'
-    order by field_name
+{%- set col_query -%}
+    select column_name
+    from {{ taxonomy_relation.database }}.information_schema.columns
+    where table_schema = '{{ taxonomy_relation.schema }}'
+      and table_name = '{{ taxonomy_relation.identifier }}'
+      and column_name not in ('PLATFORM', 'CAMPAIGN_ID', 'CAMPAIGN_NAME', 'LEVEL', 'MAPPED_BY', 'MAPPED_AT')
+    order by ordinal_position
 {%- endset -%}
 
-{%- set results = run_query(field_query) -%}
+{%- set results = run_query(col_query) -%}
 
 {%- if execute -%}
-    {%- set field_names = results.columns[0].values() -%}
+    {%- set col_names = results.columns[0].values() -%}
 {%- else -%}
-    {%- set field_names = [] -%}
+    {%- set col_names = [] -%}
 {%- endif -%}
 
-{%- set skip_fields = ['platform'] -%}
-{%- for field in field_names if field not in skip_fields -%}
-    {%- set col_name = '"EVENT"' if field | upper == 'EVENT' else field -%}
+{%- for col in col_names -%}
+    {%- set col_name = '"EVENT"' if col | upper == 'EVENT' else col -%}
     {%- if alias -%}
         {{ alias }}.{{ col_name }}
     {%- else -%}
