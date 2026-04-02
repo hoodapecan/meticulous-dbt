@@ -2,36 +2,35 @@
     meticulous_taxonomy_columns
 
     Generates a comma-separated list of taxonomy dimension columns.
-    Discovers columns from the pivoted staging model via INFORMATION_SCHEMA.
+    Discovers field names from the source table at compile time.
 
     Usage:
         {{ meticulous_dbt.meticulous_taxonomy_columns(
-            ref('stg_meticulous__taxonomy_mappings'),
+            source('meticulous', 'meticulous_taxonomy_mappings'),
             alias='t'
         ) }}
 #}
 
-{% macro meticulous_taxonomy_columns(taxonomy_relation, alias=none) %}
+{% macro meticulous_taxonomy_columns(taxonomy_source, alias=none) %}
 
-{%- set col_query -%}
-    select column_name
-    from {{ taxonomy_relation.database }}.information_schema.columns
-    where table_schema = '{{ taxonomy_relation.schema }}'
-      and table_name = '{{ taxonomy_relation.identifier }}'
-      and column_name not in ('PLATFORM', 'CAMPAIGN_ID', 'CAMPAIGN_NAME', 'LEVEL', 'MAPPED_BY', 'MAPPED_AT')
-    order by ordinal_position
+{%- set field_query -%}
+    select distinct field_name
+    from {{ taxonomy_source }}
+    where level = 'campaign'
+    order by field_name
 {%- endset -%}
 
-{%- set results = run_query(col_query) -%}
+{%- set results = run_query(field_query) -%}
 
 {%- if execute -%}
-    {%- set col_names = results.columns[0].values() -%}
+    {%- set field_names = results.columns[0].values() -%}
 {%- else -%}
-    {%- set col_names = [] -%}
+    {%- set field_names = [] -%}
 {%- endif -%}
 
-{%- for col in col_names -%}
-    {%- set col_name = '"EVENT"' if col | upper == 'EVENT' else col -%}
+{%- set skip_fields = ['platform'] -%}
+{%- for field in field_names if field not in skip_fields -%}
+    {%- set col_name = '"EVENT"' if field | upper == 'EVENT' else field -%}
     {%- if alias -%}
         {{ alias }}.{{ col_name }}
     {%- else -%}

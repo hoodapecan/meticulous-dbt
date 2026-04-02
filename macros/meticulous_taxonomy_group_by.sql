@@ -2,36 +2,34 @@
     meticulous_taxonomy_group_by
 
     Returns numbered group-by references for taxonomy columns.
-    Discovers columns from the pivoted staging model via INFORMATION_SCHEMA.
 
     Usage:
         group by 1, 2, 3
             {{ meticulous_dbt.meticulous_taxonomy_group_by(
-                ref('stg_meticulous__taxonomy_mappings'),
+                source('meticulous', 'meticulous_taxonomy_mappings'),
                 offset=3
             ) }}
 #}
 
-{% macro meticulous_taxonomy_group_by(taxonomy_relation, offset=0) %}
+{% macro meticulous_taxonomy_group_by(taxonomy_source, offset=0) %}
 
-{%- set col_query -%}
-    select column_name
-    from {{ taxonomy_relation.database }}.information_schema.columns
-    where table_schema = '{{ taxonomy_relation.schema }}'
-      and table_name = '{{ taxonomy_relation.identifier }}'
-      and column_name not in ('PLATFORM', 'CAMPAIGN_ID', 'CAMPAIGN_NAME', 'LEVEL', 'MAPPED_BY', 'MAPPED_AT')
-    order by ordinal_position
+{%- set field_query -%}
+    select distinct field_name
+    from {{ taxonomy_source }}
+    where level = 'campaign'
+    order by field_name
 {%- endset -%}
 
-{%- set results = run_query(col_query) -%}
+{%- set results = run_query(field_query) -%}
 
 {%- if execute -%}
-    {%- set col_names = results.columns[0].values() -%}
+    {%- set field_names = results.columns[0].values() -%}
 {%- else -%}
-    {%- set col_names = [] -%}
+    {%- set field_names = [] -%}
 {%- endif -%}
 
-{%- for col in col_names -%}
+{%- set skip_fields = ['platform'] -%}
+{%- for field in field_names if field not in skip_fields -%}
     , {{ offset + loop.index }}
 {%- endfor -%}
 
