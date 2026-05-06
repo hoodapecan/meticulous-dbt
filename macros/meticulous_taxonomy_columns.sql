@@ -4,19 +4,31 @@
     Generates a comma-separated list of taxonomy dimension columns.
     Discovers field names from the source table at compile time.
 
+    `level` controls which mapping rows to read. Default 'campaign' for
+    backward compatibility. Pass level='ad' to emit ad-grain taxonomy
+    fields (e.g. creative). When a field exists at both campaign- and
+    ad-grain (rare), call this macro twice — once per level — and join
+    each pivot at the appropriate grain.
+
     Usage:
         {{ meticulous_dbt.meticulous_taxonomy_columns(
             source('meticulous', 'meticulous_taxonomy_mappings'),
             alias='t'
         ) }}
+
+        {{ meticulous_dbt.meticulous_taxonomy_columns(
+            source('meticulous', 'meticulous_taxonomy_mappings'),
+            alias='t_ad',
+            level='ad'
+        ) }}
 #}
 
-{% macro meticulous_taxonomy_columns(taxonomy_source, alias=none) %}
+{% macro meticulous_taxonomy_columns(taxonomy_source, alias=none, level='campaign') %}
 
 {%- set field_query -%}
     select distinct field_name
     from {{ taxonomy_source }}
-    where level = 'campaign'
+    where level = '{{ level }}'
     order by field_name
 {%- endset -%}
 
@@ -52,7 +64,7 @@
     Disappears the moment the taxonomy mappings table has classified data.
 -#}
 {%- if not emitted.any -%}
-    null as _meticulous_no_taxonomy_yet
+    null as _meticulous_no_{{ level }}_taxonomy_yet
 {%- endif -%}
 
 {% endmacro %}
