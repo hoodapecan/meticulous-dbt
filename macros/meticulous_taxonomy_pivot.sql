@@ -61,8 +61,20 @@ pivoted as (
         entity_name as {{ entity_name_alias }},
         level,
         {%- set skip_fields = ['platform'] -%}
+        {%- set reserved = ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] -%}
         {%- for field in field_names if field not in skip_fields %}
-        max(case when field_name = '{{ field }}' then value_code end) as {{ '"' ~ field | upper ~ '"' if field | upper in ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] else field }}
+        {#- Quote reserved words (preserve old uppercase behavior) and any
+            field containing chars outside [a-z0-9_] (defends against
+            historical data where the app didn't normalize field_name). -#}
+        {%- set unsafe_chars = modules.re.search('[^a-z0-9_]', field | lower) -%}
+        {%- if field | upper in reserved -%}
+            {%- set col_name = '"' ~ field | upper ~ '"' -%}
+        {%- elif unsafe_chars -%}
+            {%- set col_name = '"' ~ field ~ '"' -%}
+        {%- else -%}
+            {%- set col_name = field -%}
+        {%- endif %}
+        max(case when field_name = '{{ field }}' then value_code end) as {{ col_name }}
         {%- if not loop.last %},{% endif %}
         {%- endfor %}
         {%- if field_names | length > 0 %},{% endif %}

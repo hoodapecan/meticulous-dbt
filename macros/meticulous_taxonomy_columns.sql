@@ -41,10 +41,19 @@
 {%- endif -%}
 
 {%- set skip_fields = ['platform'] -%}
+{%- set reserved = ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] -%}
 {%- set emitted = namespace(any=false) -%}
 {%- for field in field_names if field not in skip_fields -%}
-    {%- set reserved = ['EVENT', 'TARGET', 'ORDER', 'GROUP', 'SELECT', 'TABLE', 'COLUMN', 'INDEX', 'KEY', 'VALUE', 'COMMENT'] -%}
-    {%- set col_name = '"' ~ field | upper ~ '"' if field | upper in reserved else field -%}
+    {#- Must align with meticulous_taxonomy_pivot's quoting logic so
+        downstream joins reference the column with the same name. -#}
+    {%- set unsafe_chars = modules.re.search('[^a-z0-9_]', field | lower) -%}
+    {%- if field | upper in reserved -%}
+        {%- set col_name = '"' ~ field | upper ~ '"' -%}
+    {%- elif unsafe_chars -%}
+        {%- set col_name = '"' ~ field ~ '"' -%}
+    {%- else -%}
+        {%- set col_name = field -%}
+    {%- endif -%}
     {%- set emitted.any = true -%}
     {%- if alias -%}
         {{ alias }}.{{ col_name }}
