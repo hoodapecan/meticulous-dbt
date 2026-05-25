@@ -55,7 +55,7 @@
 {#- We tolerate missing table (fresh client) by guarding with execute and -#}
 {#- defaulting to []. -#}
 {%- set rows = [] -%}
-{%- if execute -%}
+{%- if execute and not meticulous_dbt._skip_runtime_lookups() -%}
     {%- set query -%}
         select metric_name, display_alias
         from {{ model_columns_source }}

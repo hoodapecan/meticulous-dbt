@@ -42,9 +42,8 @@
     order by field_name
 {%- endset -%}
 
-{%- set results = run_query(field_query) -%}
-
-{%- if execute -%}
+{%- if execute and not meticulous_dbt._skip_runtime_lookups() -%}
+    {%- set results = run_query(field_query) -%}
     {%- set field_names = results.columns[0].values() -%}
 {%- else -%}
     {%- set field_names = [] -%}

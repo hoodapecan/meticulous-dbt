@@ -31,9 +31,7 @@
     LIMIT 1
 {%- endset -%}
 
-{%- set _skip_via_env = env_var('METICULOUS_SKIP_RUNTIME_LOOKUPS', 'false') | lower in ['true', '1', 'yes'] -%}
-{%- set _skip_via_var = var('skip_meticulous_runtime_lookups', false) in [true, 'true', 'True', 1, '1'] -%}
-{%- if execute and not _skip_via_env and not _skip_via_var -%}
+{%- if execute and not meticulous_dbt._skip_runtime_lookups() -%}
     {%- set result = run_query(start_query) -%}
     {%- if result and result.rows | length > 0 and result.rows[0][0] -%}
         AND {{ date_column }} >= '{{ result.rows[0][0] }}'
