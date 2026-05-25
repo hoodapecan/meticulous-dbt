@@ -11,6 +11,13 @@
                 source('meticulous', 'meticulous_config'),
                 date_column='calendardate'
             ) }}
+
+    CI / lint:
+        The macro runs a query at compile time. To skip the lookup (e.g. in
+        a CI lint step that points at a stub no-connection profile), set
+        the var skip_meticulous_runtime_lookups=true:
+            dbt compile --vars '{skip_meticulous_runtime_lookups: true}'
+        With the var set, no filter is emitted.
 #}
 
 {% macro meticulous_data_start_filter(config_source, date_column='REPORT_DATE') %}
@@ -22,7 +29,7 @@
     LIMIT 1
 {%- endset -%}
 
-{%- if execute -%}
+{%- if execute and not var('skip_meticulous_runtime_lookups', false) -%}
     {%- set result = run_query(start_query) -%}
     {%- if result and result.rows | length > 0 and result.rows[0][0] -%}
         AND {{ date_column }} >= '{{ result.rows[0][0] }}'
