@@ -52,23 +52,33 @@
 {% macro meticulous_conversion_columns(model_columns_source, vertical_alias='v') %}
 
 {#- Discover rows at compile time. -#}
-{#- We tolerate missing table (fresh client) by guarding with execute and -#}
-{#- defaulting to []. -#}
+{#- Tolerate a missing table (fresh client whose operator hasn't saved -#}
+{#- Model Columns yet): adapter.get_relation() before run_query, so the -#}
+{#- mart builds with just the universal floor instead of erroring with -#}
+{#- "object does not exist" (MET-78). -#}
 {%- set rows = [] -%}
 {%- if execute and not meticulous_dbt._skip_runtime_lookups() -%}
-    {%- set query -%}
-        select metric_name, display_alias
-        from {{ model_columns_source }}
-        order by position, metric_name
-    {%- endset -%}
+    {%- set src_relation = adapter.get_relation(
+            database=model_columns_source.database,
+            schema=model_columns_source.schema,
+            identifier=model_columns_source.identifier) -%}
+    {%- if src_relation is none -%}
+        {%- do log('meticulous_conversion_columns: ' ~ model_columns_source ~ ' does not exist yet — emitting universal floor only', info=True) -%}
+    {%- else -%}
+        {%- set query -%}
+            select metric_name, display_alias
+            from {{ model_columns_source }}
+            order by position, metric_name
+        {%- endset -%}
 
-    {%- set results = run_query(query) -%}
-    {%- if results and results.rows is not none and results.rows | length > 0 -%}
-        {%- set metric_col = results.columns[0].values() -%}
-        {%- set alias_col = results.columns[1].values() -%}
-        {%- for i in range(metric_col | length) -%}
-            {%- set _ = rows.append({'metric_name': metric_col[i], 'display_alias': alias_col[i]}) -%}
-        {%- endfor -%}
+        {%- set results = run_query(query) -%}
+        {%- if results and results.rows is not none and results.rows | length > 0 -%}
+            {%- set metric_col = results.columns[0].values() -%}
+            {%- set alias_col = results.columns[1].values() -%}
+            {%- for i in range(metric_col | length) -%}
+                {%- set _ = rows.append({'metric_name': metric_col[i], 'display_alias': alias_col[i]}) -%}
+            {%- endfor -%}
+        {%- endif -%}
     {%- endif -%}
 {%- endif -%}
 
