@@ -89,6 +89,38 @@ left join actual_spend s
     ) }}
 ```
 
+### `latest_campaign_name`
+
+Returns one canonical name per `campaign_id` — the latest observed. Renamed campaigns otherwise carry their historical name on every metric row and split into two entities downstream.
+
+```sql
+campaign_names as (
+    {{ meticulous_dbt.latest_campaign_name(ref('stg_google_ads__campaign_dim')) }}
+)
+```
+
+### `latest_conversion_action_name`
+
+The conversion-action sibling of `latest_campaign_name`. Fivetran keys Google Ads metrics rows on the conversion action *name*, so renaming a goal starts a new row series instead of rewriting history — one action becomes two `metric_name` values, and `METICULOUS_MODEL_COLUMNS` can only match one of them. This picks the latest name per action resource id and applies it across all history, so a rename self-heals on the next run.
+
+```sql
+conversion_action_names as (
+    {{ meticulous_dbt.latest_conversion_action_name(ref('stg_google_ads__campaign_metrics')) }}
+),
+
+conv_agg as (
+    select
+        m.campaign_id,
+        m.report_date,
+        lower(regexp_replace(a.conversion_action_name, '[ -]+', '_')) || '_all_conversions' as metric_name,
+        sum(m.all_conversions)::float as metric_value
+    from {{ ref('stg_google_ads__campaign_metrics') }} m
+    left join conversion_action_names a
+        on m.conversion_action = a.conversion_action
+    group by 1, 2, 3
+)
+```
+
 ## What stays client-specific
 
 - **Conversion metrics** — the CASE WHEN pivots for platform-specific conversions (purchases, leads, etc.)
