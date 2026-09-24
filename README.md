@@ -132,3 +132,16 @@ conv_agg as (
 - Dynamic taxonomy dimension discovery
 - Taxonomy pivot, select, join, and group-by generation
 - Reserved keyword quoting (e.g., EVENT)
+
+### `rudderstack_sync_history`
+
+Select body for a client **snapshot** that persists RudderStack Reverse ETL sync state past RudderStack's own retention (`SYNC_LOG` ~30 days, per-run `SNAPSHOT_<conn>_<run>` tables ~3 days). One row per connection × sync run × primary key, with the payload that was sent. Emails and phones are stored as SHA-256 hashes. Snowflake-only. See the macro header for payload resolution (`same_run` / `latest_snapshot` / null) and snapshot config (MET-163).
+
+```sql
+-- snapshots/rudderstack_sync_history.sql
+{% snapshot rudderstack_sync_history %}
+{{ config(unique_key='sync_log_key', strategy='check', check_cols=['operation', 'status', 'error_reason']) }}
+{{ meticulous_dbt.rudderstack_sync_history(source('rudderstack', 'sync_log'), primary_key_column='offline_conversion_key') }}
+{% endsnapshot %}
+```
+
