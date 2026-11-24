@@ -145,3 +145,45 @@ Select body for a client **snapshot** that persists RudderStack Reverse ETL sync
 {% endsnapshot %}
 ```
 
+
+## GA4 standard (JP-27)
+
+GA4 site traffic lands in `campaign_performance` the same way for every client, whichever connector (Fivetran or Airbyte) loads it.
+
+**Reports to sync** (GA4 Data API, daily): traffic acquisition by session source/medium, traffic acquisition by session campaign, user acquisition by first-user source/medium, events. Include `keyEvents` in the acquisition reports where the connector allows it.
+
+**Client staging contract.** Each client writes three thin staging models. Connector quirks (column case, duplicate rows, `YYYYMMDD` dates) are handled there and nowhere else.
+
+| Model | Columns |
+|---|---|
+| `stg_ga4__traffic_acquisition` | `report_date`, `session_source`, `session_medium`, `sessions`, `engaged_sessions`, `total_users`, `user_engagement_duration`, `key_events` (null if not synced), `total_revenue` |
+| `stg_ga4__user_acquisition` | `report_date`, `first_user_source`, `first_user_medium`, `new_users`, `returning_users` |
+| `stg_ga4__events` | `report_date`, `event_name`, `event_count`, `total_revenue` |
+
+**Shared logic** (one-line client models):
+
+```sql
+-- models/intermediate/int_ga4__channel_metrics_unpivot.sql
+{{ meticulous_dbt.ga4_channel_metrics_unpivot(
+    ref('stg_ga4__traffic_acquisition'), ref('stg_ga4__user_acquisition')) }}
+
+-- models/intermediate/int_ga4__events_unpivot.sql
+{{ meticulous_dbt.ga4_events_unpivot(ref('stg_ga4__events')) }}
+
+-- tests/assert_ga4_channel_sessions_reconcile.sql
+{{ meticulous_dbt.ga4_channel_sessions_reconcile(
+    ref('stg_ga4__traffic_acquisition'), ref('int_ga4__channel_metrics_unpivot')) }}
+```
+
+- Channel rows: one sentinel campaign per channel group per day (`paid_search`, `paid_social`, `display`, `organic_search`, `organic_social`, `direct`, `referral`, `email`, `unassigned`) carrying `site_*` metrics. Platform `GA4`, data_source `ga4`.
+- Event rows: one metric per event name (plus `<event>_revenue`). The client's cross-platform union puts them on campaign_id `unattributed`.
+
+**Channel rules** live in `ga4_default_channel_rules()`. Add client rules in `dbt_project.yml`; they merge with the defaults, lowest priority number first:
+
+```yaml
+vars:
+  meticulous_ga4_extra_channel_rules:
+    - {priority: 45, channel_group: display, source_regex: 'nbc4|wcmh', medium_regex: '.*'}
+```
+
+Regexes are matched against the lowercased source/medium and must match the whole value.
